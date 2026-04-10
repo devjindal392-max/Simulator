@@ -218,3 +218,92 @@ def execute():
             pc =pc+imm
         else:
             pc+=4
+
+#JAL
+    elif(opcode==0b1101111):
+        rd=(ins>>7)&0x1F
+
+        imm=sext(
+            ((ins>>31)<<20)|
+            (((ins>>12)&0xFF)<<12)|
+            (((ins>>20)&1)<<11)|
+            (((ins>>21)&0x3FF)<<1),
+            21
+        )
+
+        write_reg(rd,pc+4)
+        pc=pc+imm
+
+    #JALR
+    elif(opcode ==0b1100111):
+        rd= (ins>>7)&0x1F
+        rs1= (ins>>15)&0x1F
+        imm= sext((ins>>20)&0xFFF,12)
+
+        temp= pc+4
+        pc=(regs[rs1]+imm)&~1
+        write_reg(rd,temp)
+
+    #LUI
+    elif(opcode ==0b0110111):
+        rd =(ins>>7)&0x1F
+        write_reg(rd,ins&0xFFFFF000)
+        pc+=4
+
+    #AUIPC
+    elif(opcode ==0b0010111):
+        rd =(ins>>7)&0x1F
+        write_reg(rd,pc+(ins&0xFFFFF000))
+        pc+=4
+
+    else:
+        return False
+
+    return True
+
+
+
+#MAIN
+def main():
+    if(len(sys.argv)<3):
+        return
+
+    input_path=sys.argv[1]
+    trace_path=sys.argv[2]
+    readable_out=sys.argv[3] if len(sys.argv)>=4 else None
+
+    load(input_path)
+    output =[]
+
+    global pc
+    pc=0
+
+    while True:
+        if pc not in program:
+            break
+
+        #executing one instruction
+        running=execute()
+
+        regs[0] =0
+
+        #log state after executing the current instruction
+        row=to_bin32(pc)+" "+" ".join(to_bin32(r) for r in regs)
+        output.append(row)
+
+        if not running:
+            break
+
+    for i in range(32):
+        addr= DATA_MEM_START+i*4
+        output.append(f"0x{addr:08X}:{to_bin32(data_mem[i])}")
+
+    with open(trace_path,"w") as f:
+        f.write("\n".join(output)+"\n")
+
+    #Optional human readable file
+    if readable_out is not None:
+        with open(readable_out,"w") as f:
+            f.write("")
+
+main()
