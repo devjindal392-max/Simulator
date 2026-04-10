@@ -145,3 +145,76 @@ def execute():
             write_reg(rd,1 if u32(regs[rs1])<u32(imm) else 0)
 
         pc+=4
+
+    #LW
+    elif(opcode==0b0000011):
+        rd=(ins>>7)&0x1F
+        rs1=(ins>>15)&0x1F
+        imm= sext((ins>>20)&0xFFF,12)
+
+        addr=u32(regs[rs1]+imm)
+
+        if(addr % 4 != 0):
+            fault_line=(pc//4)+1
+            return None
+        
+        write_reg(rd,read_mem(addr))
+
+        pc+=4
+
+
+
+    #SW
+    elif(opcode==0b0100011):
+        rs1=(ins>>15)&0x1F
+        rs2=(ins>>20)&0x1F
+        imm=sext(((ins>>25)<<5)|((ins>>7)&0x1F),12)
+
+        addr=u32(regs[rs1]+imm)
+
+        if(addr % 4 != 0):
+            fault_line=(pc//4)+1
+            return None
+
+        write_mem(addr,regs[rs2])
+
+        pc+=4
+
+    #BRANCH
+    elif(opcode ==0b1100011):
+        f3=(ins>>12)&0x07
+        rs1=(ins>>15)&0x1F
+        rs2= (ins>>20)&0x1F
+
+        imm=sext(
+            ((ins>>31)<<12)|
+            (((ins>>7)&1)<<11)|
+            (((ins>>25)&0x3F)<<5)|
+            (((ins>>8)&0xF)<<1),
+            13
+        )
+
+        # Virtual Halt: beq x0,x0,0
+        if(f3==0 and rs1==0 and rs2==0 and imm==0):
+            return False
+
+        a,b=s32(regs[rs1]),s32(regs[rs2])
+
+        cond=False
+        if(f3==0):
+            cond=(a==b)
+        elif(f3==1):
+            cond=(a!=b)
+        elif(f3==4):
+            cond=(a<b)
+        elif(f3==5):
+            cond=(a>=b)
+        elif(f3==6):
+            cond=(u32(a)<u32(b))
+        elif(f3==7):
+            cond=(u32(a)>=u32(b))
+
+        if(cond):
+            pc =pc+imm
+        else:
+            pc+=4
